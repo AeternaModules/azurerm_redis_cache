@@ -30,7 +30,7 @@ resource "azurerm_redis_cache" "redis_caches" {
   }
 
   dynamic "patch_schedule" {
-    for_each = each.value.patch_schedule != null ? [each.value.patch_schedule] : []
+    for_each = each.value.patch_schedule != null ? each.value.patch_schedule : []
     content {
       day_of_week        = patch_schedule.value.day_of_week
       maintenance_window = patch_schedule.value.maintenance_window

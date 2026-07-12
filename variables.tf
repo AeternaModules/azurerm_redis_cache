@@ -72,11 +72,11 @@ EOT
       identity_ids = optional(set(string))
       type         = string
     }))
-    patch_schedule = optional(object({
+    patch_schedule = optional(list(object({
       day_of_week        = string
       maintenance_window = optional(string) # Default: "PT5H"
       start_hour_utc     = optional(number)
-    }))
+    })))
     redis_configuration = optional(object({
       active_directory_authentication_enabled = optional(bool)
       aof_backup_enabled                      = optional(bool)
@@ -96,62 +96,6 @@ EOT
       storage_account_subscription_id         = optional(string)
     }))
   }))
-  validation {
-    condition = alltrue([
-      for k, v in var.redis_caches : (
-        v.zones == null || (length(v.zones) > 0)
-      )
-    ])
-    error_message = "must not be empty"
-  }
-  validation {
-    condition = alltrue([
-      for k, v in var.redis_caches : (
-        v.redis_configuration == null || (v.redis_configuration.data_persistence_authentication_method == null || (contains(["SAS", "ManagedIdentity"], v.redis_configuration.data_persistence_authentication_method)))
-      )
-    ])
-    error_message = "must be one of: SAS, ManagedIdentity"
-  }
-  validation {
-    condition = alltrue([
-      for k, v in var.redis_caches : (
-        v.redis_configuration == null || (v.redis_configuration.storage_account_subscription_id == null || (can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", v.redis_configuration.storage_account_subscription_id))))
-      )
-    ])
-    error_message = "must be a valid UUID"
-  }
-  validation {
-    condition = alltrue([
-      for k, v in var.redis_caches : (
-        v.patch_schedule == null || (v.patch_schedule.start_hour_utc == null || (v.patch_schedule.start_hour_utc >= 0 && v.patch_schedule.start_hour_utc <= 23))
-      )
-    ])
-    error_message = "must be between 0 and 23"
-  }
-  validation {
-    condition = alltrue([
-      for k, v in var.redis_caches : (
-        v.replicas_per_master == null || (v.replicas_per_master >= 1 && v.replicas_per_master <= 3)
-      )
-    ])
-    error_message = "must be between 1 and 3"
-  }
-  validation {
-    condition = alltrue([
-      for k, v in var.redis_caches : (
-        v.replicas_per_primary == null || (v.replicas_per_primary >= 1 && v.replicas_per_primary <= 3)
-      )
-    ])
-    error_message = "must be between 1 and 3"
-  }
-  validation {
-    condition = alltrue([
-      for k, v in var.redis_caches : (
-        v.redis_version == null || (contains(["4", "6"], v.redis_version))
-      )
-    ])
-    error_message = "must be one of: 4, 6"
-  }
   # --- Unconfirmed validation candidates, derived from azurerm_redis_cache's provider source ---
   # Not auto-enabled: either a bespoke provider validator we can't safely translate,
   # or a path that crosses a list-typed block (needs its own for_each wrapping).
@@ -172,6 +116,9 @@ EOT
   #   source:    [from resourcegroups.ValidateName: invalid when len(value) == 0]
   # path: resource_group_name
   #   source:    [from resourcegroups.ValidateName] !matched
+  # path: zones[*]
+  #   condition: length(value) > 0
+  #   message:   must not be empty
   # path: family
   #   source:    validation.StringInSlice value list is not a literal []string - likely a generated PossibleValuesFor*() helper; resolve separately
   # path: sku_name
@@ -184,20 +131,38 @@ EOT
   #   source:    [from commonids.ValidateSubnetID] err != nil
   # path: redis_configuration.maxmemory_policy
   #   source:    validate.MaxMemoryPolicy: no recognizable `if ... { errors = append(...) }` pattern - read it by hand
+  # path: redis_configuration.data_persistence_authentication_method
+  #   condition: contains(["SAS", "ManagedIdentity"], value)
+  #   message:   must be one of: SAS, ManagedIdentity
   # path: redis_configuration.rdb_backup_frequency
   #   source:    [from validate.CacheBackupFrequency] !families[value]
+  # path: redis_configuration.storage_account_subscription_id
+  #   condition: can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", value))
+  #   message:   must be a valid UUID
   # path: patch_schedule.day_of_week
   #   source:    validation.IsDayOfTheWeek(...) - no translation rule yet, add one
   # path: patch_schedule.maintenance_window
   #   source:    [from azValidate.ISO8601Duration] !ok
   # path: patch_schedule.maintenance_window
   #   source:    [from azValidate.ISO8601Duration] err != nil
+  # path: patch_schedule.start_hour_utc
+  #   condition: value >= 0 && value <= 23
+  #   message:   must be between 0 and 23
+  # path: replicas_per_master
+  #   condition: value >= 1 && value <= 3
+  #   message:   must be between 1 and 3
   # path: identity.type
   #   source:    validation.StringInSlice value list is not a literal []string - likely a generated PossibleValuesFor*() helper; resolve separately
   # path: identity.identity_ids[*]
   #   source:    [from commonids.ValidateUserAssignedIdentityID] !ok
   # path: identity.identity_ids[*]
   #   source:    [from commonids.ValidateUserAssignedIdentityID] err != nil
+  # path: replicas_per_primary
+  #   condition: value >= 1 && value <= 3
+  #   message:   must be between 1 and 3
+  # path: redis_version
+  #   condition: contains(["4", "6"], value)
+  #   message:   must be one of: 4, 6
   # path: tags
   #   condition: length(value) <= 50
   #   message:   [from tags.Validate: invalid when len(value) > 50]
