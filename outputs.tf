@@ -1,3 +1,7 @@
+output "redis_caches_id" {
+  description = "Map of id values across all redis_caches, keyed the same as var.redis_caches"
+  value       = { for k, v in azurerm_redis_cache.redis_caches : k => v.id }
+}
 output "redis_caches_access_keys_authentication_enabled" {
   description = "Map of access_keys_authentication_enabled values across all redis_caches, keyed the same as var.redis_caches"
   value       = { for k, v in azurerm_redis_cache.redis_caches : k => v.access_keys_authentication_enabled }
